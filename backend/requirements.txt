@@ -1,0 +1,8 @@
+fastapi==0.115.0
+uvicorn[standard]==0.30.6
+python-multipart==0.0.9
+openai-whisper==20231117
+# Whisper depends on torch. If you have a CUDA GPU and want acceleration,
+# install a CUDA-enabled torch build from https://pytorch.org/get-started/locally/
+# instead of relying on this default (CPU) build.
+torch==2.3.1

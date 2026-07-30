@@ -1,0 +1,37 @@
+backend/venv/
+backend/uploads/*
+!backend/uploads/.gitkeep
+frontend/node_modules/
+frontend/dist/
+__pycache__/
+*.pyc
+
+# Python
+backend/venv/
+__pycache__/
+*.pyc
+
+# Node
+frontend/node_modules/
+
+# Environment variables
+.env
+
+# Uploaded files
+backend/uploads/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+
+# Build folders
+dist/
+build/
+
+# Python cache
+.pytest_cache/
