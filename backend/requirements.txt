@@ -1,8 +1,37 @@
+# ==========================
+# FastAPI
+# ==========================
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
 python-multipart==0.0.9
-openai-whisper==20231117
-# Whisper depends on torch. If you have a CUDA GPU and want acceleration,
-# install a CUDA-enabled torch build from https://pytorch.org/get-started/locally/
-# instead of relying on this default (CPU) build.
-torch==2.3.1
+python-dotenv==1.0.1
+
+# ==========================
+# Whisper
+# ==========================
+openai-whisper==20250625
+
+# ==========================
+# PyTorch
+# Pinned as a matched trio — do NOT bump any one of these
+# independently, that's what breaks pyannote.
+# ==========================
+torch==2.1.0
+torchaudio==2.1.0
+numpy==1.26.4
+
+# ==========================
+# Speaker Diarization
+# huggingface_hub and speechbrain are pinned explicitly (not left
+# to pip's resolver) because newer releases of both break pyannote
+# 3.1.1's internal calls (use_auth_token / cached_download removal,
+# speechbrain.pretrained -> speechbrain.inference rename).
+# ==========================
+pyannote.audio==3.1.1
+huggingface_hub==0.20.3
+speechbrain==0.5.16
+
+# ==========================
+# Audio
+# ==========================
+soundfile==0.12.1

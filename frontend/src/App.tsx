@@ -11,10 +11,19 @@ interface WhisperSegment {
   text: string;
 }
 
+interface MergedSegment {
+  speaker: string;
+  start: number;
+  end: number;
+  text: string;
+}
+
 interface TranscribeResponse {
   status: string;
   text: string;
   segments: WhisperSegment[];
+  merged: MergedSegment[];
+  transcript: MergedSegment[];
 }
 
 function App() {
@@ -23,6 +32,8 @@ function App() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [transcription, setTranscription] = useState<string>("");
   const [segments, setSegments] = useState<WhisperSegment[]>([]);
+  const [mergedTranscript, setMergedTranscript] = useState<MergedSegment[]>([]);
+  const [speakerTranscript, setSpeakerTranscript] = useState<MergedSegment[]>([]);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
@@ -31,6 +42,8 @@ function App() {
     setErrorMessage(null);
     setTranscription("");
     setSegments([]);
+    setMergedTranscript([]);
+    setSpeakerTranscript([]);
   };
 
   const handleUpload = async (event: FormEvent) => {
@@ -45,6 +58,8 @@ function App() {
     setErrorMessage(null);
     setTranscription("");
     setSegments([]);
+    setMergedTranscript([]);
+    setSpeakerTranscript([]);
 
     const formData = new FormData();
     formData.append("file", selectedFile);
@@ -65,6 +80,8 @@ function App() {
       const result = data as TranscribeResponse;
         setTranscription(result.text);
         setSegments(result.segments);
+        setMergedTranscript(result.merged);
+        setSpeakerTranscript(result.transcript);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Something went wrong while uploading.";
@@ -106,31 +123,85 @@ function App() {
           readOnly
         />
 
-        {segments.length > 0 && (
+        {speakerTranscript.length > 0 && (
         <div style={{ marginTop: "20px" }}>
-          <h2>Whisper Segments</h2>
+          <h2>Speaker Transcript</h2>
 
-          {segments.map((segment) => (
+          {speakerTranscript.map((entry, index) => (
             <div
-              key={segment.id}
+              key={index}
               style={{
                 border: "1px solid #ddd",
-                padding: "10px",
+                padding: "12px 14px",
                 marginBottom: "10px",
                 borderRadius: "8px",
               }}
             >
               <strong>
-                {segment.start.toFixed(2)}s → {segment.end.toFixed(2)}s
+                {entry.speaker} — {entry.start.toFixed(2)}s → {entry.end.toFixed(2)}s
               </strong>
 
-            <p>{segment.text}</p>
+            <p style={{ marginBottom: 0 }}>{entry.text}</p>
         </div>
     ))}
   </div>
 )}
 
+        {(mergedTranscript.length > 0 || segments.length > 0) && (
+        <details style={{ marginTop: "24px" }}>
+          <summary style={{ cursor: "pointer", color: "#555" }}>
+            Debug: raw per-segment output
+          </summary>
 
+          {mergedTranscript.length > 0 && (
+          <div style={{ marginTop: "16px" }}>
+            <h3>Merged (per Whisper segment, ungrouped)</h3>
+
+            {mergedTranscript.map((entry, index) => (
+              <div
+                key={index}
+                style={{
+                  border: "1px solid #eee",
+                  padding: "8px 10px",
+                  marginBottom: "6px",
+                  borderRadius: "6px",
+                  fontSize: "0.9rem",
+                }}
+              >
+                <strong>
+                  {entry.speaker} — {entry.start.toFixed(2)}s → {entry.end.toFixed(2)}s
+                </strong>
+                <p style={{ marginBottom: 0 }}>{entry.text}</p>
+              </div>
+            ))}
+          </div>
+          )}
+
+          {segments.length > 0 && (
+          <div style={{ marginTop: "16px" }}>
+            <h3>Whisper Segments (no speaker labels)</h3>
+
+            {segments.map((segment) => (
+              <div
+                key={segment.id}
+                style={{
+                  border: "1px solid #eee",
+                  padding: "8px 10px",
+                  marginBottom: "6px",
+                  borderRadius: "6px",
+                  fontSize: "0.9rem",
+                }}
+              >
+                <strong>
+                  {segment.start.toFixed(2)}s → {segment.end.toFixed(2)}s
+                </strong>
+                <p style={{ marginBottom: 0 }}>{segment.text}</p>
+              </div>
+            ))}
+          </div>
+          )}
+        </details>
+)}
 
       </div>
     </div>

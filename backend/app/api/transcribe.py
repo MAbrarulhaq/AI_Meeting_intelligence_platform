@@ -13,6 +13,12 @@ from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, HTTPException
 
 from app.services.transcription_service import transcribe_audio
+from app.services.diarization_service import diarize_audio
+from app.services.transcript_service import (
+    merge_transcript,
+    group_consecutive_speakers,
+    print_merged_transcript,
+)
 
 router = APIRouter()
 
@@ -44,7 +50,8 @@ def _validate_file_extension(filename: str) -> str:
 async def transcribe_endpoint(file: UploadFile = File(...)):
     """
     Accept an uploaded meeting recording, transcribe it with Whisper,
-    and return both the full transcription and Whisper segments.
+    diarize it with PyAnnote, merge both into a speaker-labelled
+    transcript, and return everything.
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file was uploaded.")
@@ -64,12 +71,30 @@ async def transcribe_endpoint(file: UploadFile = File(...)):
             f.write(contents)
 
         # Run Whisper on the saved file.
+        print("File exists before Whisper:", temp_path.exists())
         transcription = transcribe_audio(str(temp_path))
+        whisper_segments = transcription["segments"]
+
+        print("File exists after Whisper:", temp_path.exists())
+
+        speaker_segments = diarize_audio(str(temp_path))
+
+        print("File exists after PyAnnote:", temp_path.exists())
+
+        # Merge Whisper's text segments with PyAnnote's speaker segments
+        # (maximum-overlap matching), then combine consecutive same-speaker
+        # segments into single turns for a readable final transcript.
+        merged_transcript = merge_transcript(whisper_segments, speaker_segments)
+        speaker_transcript = group_consecutive_speakers(merged_transcript)
+        print_merged_transcript(speaker_transcript)
 
         return {
             "status": "success",
             "text": transcription["text"],
-            "segments": transcription["segments"]
+            "segments": whisper_segments,
+            "speakers": speaker_segments,
+            "merged": merged_transcript,
+            "transcript": speaker_transcript,
         }
 
     except HTTPException:
