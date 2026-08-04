@@ -19,6 +19,7 @@ from app.services.transcript_service import (
     group_consecutive_speakers,
     print_merged_transcript,
 )
+from app.services.meeting_service import generate_meeting_intelligence
 
 router = APIRouter()
 
@@ -88,6 +89,13 @@ async def transcribe_endpoint(file: UploadFile = File(...)):
         speaker_transcript = group_consecutive_speakers(merged_transcript)
         print_merged_transcript(speaker_transcript)
 
+        # Phase 4: send the grouped transcript to Gemini (via LangChain)
+        # for meeting intelligence (summary, action items, decisions,
+        # deadlines, key topics). generate_meeting_intelligence raises
+        # RuntimeError on failure, caught and turned into a 500 below —
+        # same pattern as the Whisper/PyAnnote error handling.
+        meeting_intelligence = generate_meeting_intelligence(speaker_transcript)
+
         return {
             "status": "success",
             "text": transcription["text"],
@@ -95,6 +103,11 @@ async def transcribe_endpoint(file: UploadFile = File(...)):
             "speakers": speaker_segments,
             "merged": merged_transcript,
             "transcript": speaker_transcript,
+            "summary": meeting_intelligence["summary"],
+            "action_items": meeting_intelligence["action_items"],
+            "decisions": meeting_intelligence["decisions"],
+            "deadlines": meeting_intelligence["deadlines"],
+            "key_topics": meeting_intelligence["key_topics"],
         }
 
     except HTTPException:

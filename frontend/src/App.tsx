@@ -18,12 +18,23 @@ interface MergedSegment {
   text: string;
 }
 
+interface ActionItem {
+  owner: string;
+  task: string;
+  deadline: string;
+}
+
 interface TranscribeResponse {
   status: string;
   text: string;
   segments: WhisperSegment[];
   merged: MergedSegment[];
   transcript: MergedSegment[];
+  summary: string;
+  action_items: ActionItem[];
+  decisions: string[];
+  deadlines: string[];
+  key_topics: string[];
 }
 
 function App() {
@@ -34,6 +45,11 @@ function App() {
   const [segments, setSegments] = useState<WhisperSegment[]>([]);
   const [mergedTranscript, setMergedTranscript] = useState<MergedSegment[]>([]);
   const [speakerTranscript, setSpeakerTranscript] = useState<MergedSegment[]>([]);
+  const [summary, setSummary] = useState<string>("");
+  const [actionItems, setActionItems] = useState<ActionItem[]>([]);
+  const [decisions, setDecisions] = useState<string[]>([]);
+  const [deadlines, setDeadlines] = useState<string[]>([]);
+  const [keyTopics, setKeyTopics] = useState<string[]>([]);
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
@@ -44,6 +60,11 @@ function App() {
     setSegments([]);
     setMergedTranscript([]);
     setSpeakerTranscript([]);
+    setSummary("");
+    setActionItems([]);
+    setDecisions([]);
+    setDeadlines([]);
+    setKeyTopics([]);
   };
 
   const handleUpload = async (event: FormEvent) => {
@@ -60,6 +81,11 @@ function App() {
     setSegments([]);
     setMergedTranscript([]);
     setSpeakerTranscript([]);
+    setSummary("");
+    setActionItems([]);
+    setDecisions([]);
+    setDeadlines([]);
+    setKeyTopics([]);
 
     const formData = new FormData();
     formData.append("file", selectedFile);
@@ -82,6 +108,11 @@ function App() {
         setSegments(result.segments);
         setMergedTranscript(result.merged);
         setSpeakerTranscript(result.transcript);
+        setSummary(result.summary);
+        setActionItems(result.action_items);
+        setDecisions(result.decisions);
+        setDeadlines(result.deadlines);
+        setKeyTopics(result.key_topics);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Something went wrong while uploading.";
@@ -146,6 +177,73 @@ function App() {
     ))}
   </div>
 )}
+
+        {speakerTranscript.length > 0 && (
+        <div style={{ marginTop: "32px" }}>
+          <h2>Meeting Summary</h2>
+          <p>{summary || "No summary available."}</p>
+
+          <h2>Action Items</h2>
+          {actionItems.length === 0 ? (
+            <p className="status">No action items found.</p>
+          ) : (
+            actionItems.map((item, index) => (
+              <div
+                key={index}
+                style={{
+                  border: "1px solid #ddd",
+                  padding: "12px 14px",
+                  marginBottom: "10px",
+                  borderRadius: "8px",
+                }}
+              >
+                <p style={{ margin: "0 0 4px 0" }}>
+                  <strong>Owner:</strong> {item.owner || "Not specified"}
+                </p>
+                <p style={{ margin: "0 0 4px 0" }}>
+                  <strong>Task:</strong> {item.task}
+                </p>
+                <p style={{ margin: 0 }}>
+                  <strong>Deadline:</strong> {item.deadline || "Not specified"}
+                </p>
+              </div>
+            ))
+          )}
+
+          <h2>Decisions</h2>
+          {decisions.length === 0 ? (
+            <p className="status">No decisions found.</p>
+          ) : (
+            <ul>
+              {decisions.map((decision, index) => (
+                <li key={index}>{decision}</li>
+              ))}
+            </ul>
+          )}
+
+          <h2>Deadlines</h2>
+          {deadlines.length === 0 ? (
+            <p className="status">No deadlines found.</p>
+          ) : (
+            <ul>
+              {deadlines.map((deadline, index) => (
+                <li key={index}>{deadline}</li>
+              ))}
+            </ul>
+          )}
+
+          <h2>Key Topics</h2>
+          {keyTopics.length === 0 ? (
+            <p className="status">No key topics found.</p>
+          ) : (
+            <ul>
+              {keyTopics.map((topic, index) => (
+                <li key={index}>{topic}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+        )}
 
         {(mergedTranscript.length > 0 || segments.length > 0) && (
         <details style={{ marginTop: "24px" }}>

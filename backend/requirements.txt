@@ -35,3 +35,13 @@ speechbrain==0.5.16
 # Audio
 # ==========================
 soundfile==0.12.1
+
+# AI Meeting Intelligence (Phase 4)
+# langchain-google-genai 4.x uses the newer 'google-genai' SDK
+# internally (not the older 'google-generativeai'). langchain-core is
+# pulled in standalone (not the full 'langchain' meta-package) since
+# only PromptTemplate/LCEL are needed here - smaller footprint, fewer
+# places for version conflicts to creep in.
+# ==========================
+langchain-core==1.5.3
+langchain-google-genai==4.2.5
