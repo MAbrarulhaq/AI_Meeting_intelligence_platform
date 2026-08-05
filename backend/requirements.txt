@@ -45,3 +45,13 @@ soundfile==0.12.1
 # ==========================
 langchain-core==1.5.3
 langchain-google-genai==4.2.5
+
+
+# ==========================
+# Persistence (Phase 5)
+# psycopg (v3) preferred over psycopg2 per spec. [binary] avoids
+# needing PostgreSQL build tools/headers installed locally.
+# ==========================
+sqlalchemy==2.0.51
+alembic==1.18.5
+psycopg[binary]==3.2.9

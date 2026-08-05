@@ -13,6 +13,7 @@ Three entrypoints, matching the three prompts in prompt.py:
 """
 
 import logging
+import traceback
 from typing import List
 
 from google.genai import errors as genai_errors
@@ -66,9 +67,11 @@ def _safe_invoke(chain, payload: dict, step_name: str) -> MeetingIntelligence:
     except genai_errors.APIError as exc:
         raise RuntimeError(f"Gemini returned an error during {step_name}: {exc}") from exc
     except Exception as exc:
-        # Catch-all so no unexpected exception (network failure, timeout,
-        # etc.) ever escapes this module unformatted.
-        raise RuntimeError(f"Unexpected error during {step_name}: {exc}") from exc
+        traceback.print_exc()
+
+        raise RuntimeError(
+            f"{type(exc).__name__}: {exc}"
+    ) from exc
 
 
 def summarize_transcript(transcript_text: str) -> MeetingIntelligence:

@@ -88,6 +88,8 @@ def generate_meeting_intelligence(speaker_transcript: List[dict]) -> dict:
 
     if not needs_chunking(transcript_text):
         result = summarize_transcript(transcript_text)
+        
+
         return _to_response_dict(result)
 
     # Long transcript - Map-Reduce.

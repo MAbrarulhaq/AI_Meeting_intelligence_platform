@@ -9,6 +9,7 @@ os.getenv() directly for these values.
 import os
 
 from dotenv import load_dotenv
+from urllib.parse import quote_plus
 
 load_dotenv()
 
@@ -39,3 +40,57 @@ def require_google_api_key() -> str:
             "(get a key from Google AI Studio)."
         )
     return GOOGLE_API_KEY
+
+
+
+# ---------------------------------------------------------------------
+# Database configuration (Phase 5)
+# ---------------------------------------------------------------------
+
+# Either set DATABASE_URL directly, or set the individual DATABASE_*
+# variables below and it's assembled automatically. DATABASE_URL takes
+# priority if both are present.
+_DATABASE_URL_ENV = os.getenv("DATABASE_URL")
+
+DATABASE_HOST = os.getenv("DATABASE_HOST", "localhost")
+DATABASE_PORT = os.getenv("DATABASE_PORT", "5432")
+DATABASE_NAME = os.getenv("DATABASE_NAME", "meeting_intelligence")
+DATABASE_USER = os.getenv("DATABASE_USER", "postgres")
+DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD", "")
+
+
+def _build_database_url() -> str | None:
+    """Assemble a SQLAlchemy database URL from config, or None if unconfigured."""
+    if _DATABASE_URL_ENV:
+        return _DATABASE_URL_ENV
+    if not (DATABASE_HOST and DATABASE_NAME and DATABASE_USER):
+        return None
+    # postgresql+psycopg: uses the psycopg (v3) driver, per the spec's
+    # preference over psycopg2.
+    user = quote_plus(DATABASE_USER)
+    password = quote_plus(DATABASE_PASSWORD)
+
+    return (
+        f"postgresql+psycopg://{user}:{password}"
+        f"@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
+    )
+
+
+DATABASE_URL = _build_database_url()
+
+
+def require_database_url() -> str:
+    """
+    Return the assembled database URL, or raise a clear error if the
+    database isn't configured at all.
+
+    Called lazily, from database/connection.py, the first time a DB
+    connection is actually needed.
+    """
+    if not DATABASE_URL:
+        raise RuntimeError(
+            "Database is not configured. Set DATABASE_URL, or set "
+            "DATABASE_HOST / DATABASE_NAME / DATABASE_USER (and optionally "
+            "DATABASE_PASSWORD / DATABASE_PORT) in your backend/.env file."
+        )
+    return DATABASE_URL

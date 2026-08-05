@@ -8,6 +8,7 @@ the transcription service, and cleaning up afterwards.
 
 import os
 import uuid
+import traceback
 from pathlib import Path
 
 from fastapi import APIRouter, UploadFile, File, HTTPException
@@ -117,10 +118,11 @@ async def transcribe_endpoint(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(exc))
 
     except Exception as exc:
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail=f"Unexpected error: {exc}"
-        )
+            detail=str(exc),
+    )
 
     finally:
         if temp_path.exists():

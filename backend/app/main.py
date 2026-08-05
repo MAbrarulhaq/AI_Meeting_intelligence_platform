@@ -2,14 +2,19 @@
 main.py
 
 FastAPI application entrypoint. Wires up CORS (so the Vite dev
-server on a different port can call this API) and registers the
-/transcribe route.
+server on a different port can call this API) and registers routes.
 """
+
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.meetings import router as meetings_router
 from app.api.transcribe import router as transcribe_router
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="Meeting Transcription MVP")
 
@@ -25,6 +30,7 @@ app.add_middleware(
 )
 
 app.include_router(transcribe_router)
+app.include_router(meetings_router)
 
 
 @app.get("/")
