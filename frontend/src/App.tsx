@@ -1,309 +1,96 @@
-import { useState, ChangeEvent, FormEvent } from "react";
+import { useState, useEffect } from "react";
+import Login from "./components/Login";
+import Signup from "./components/Signup";
+import Transcription from "./components/Transcription";
+import { authFetch, clearStoredToken, getStoredToken, storeToken } from "./auth";
 
-// Backend base URL. Hardcoded for the MVP since there's only one
-// environment to worry about (local dev).
 const API_BASE_URL = "http://localhost:8000";
 
-interface WhisperSegment {
-  id: number;
-  start: number;
-  end: number;
-  text: string;
-}
+type View = "login" | "signup" | "app";
 
-interface MergedSegment {
-  speaker: string;
-  start: number;
-  end: number;
-  text: string;
-}
-
-interface ActionItem {
-  owner: string;
-  task: string;
-  deadline: string;
-}
-
-interface TranscribeResponse {
-  status: string;
-  text: string;
-  segments: WhisperSegment[];
-  merged: MergedSegment[];
-  transcript: MergedSegment[];
-  summary: string;
-  action_items: ActionItem[];
-  decisions: string[];
-  deadlines: string[];
-  key_topics: string[];
+interface AuthUser {
+  id: string;
+  full_name: string;
+  email: string;
+  created_at: string;
 }
 
 function App() {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [transcription, setTranscription] = useState<string>("");
-  const [segments, setSegments] = useState<WhisperSegment[]>([]);
-  const [mergedTranscript, setMergedTranscript] = useState<MergedSegment[]>([]);
-  const [speakerTranscript, setSpeakerTranscript] = useState<MergedSegment[]>([]);
-  const [summary, setSummary] = useState<string>("");
-  const [actionItems, setActionItems] = useState<ActionItem[]>([]);
-  const [decisions, setDecisions] = useState<string[]>([]);
-  const [deadlines, setDeadlines] = useState<string[]>([]);
-  const [keyTopics, setKeyTopics] = useState<string[]>([]);
+  const [view, setView] = useState<View>("login");
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
-    setSelectedFile(file);
-    // Clear stale results when a new file is picked.
-    setErrorMessage(null);
-    setTranscription("");
-    setSegments([]);
-    setMergedTranscript([]);
-    setSpeakerTranscript([]);
-    setSummary("");
-    setActionItems([]);
-    setDecisions([]);
-    setDeadlines([]);
-    setKeyTopics([]);
-  };
-
-  const handleUpload = async (event: FormEvent) => {
-    event.preventDefault();
-
-    if (!selectedFile) {
-      setErrorMessage("Please choose a file first.");
+  // On page load: if a token is already stored, validate it against
+  // /auth/me before deciding whether to show Login or the app. This
+  // is what makes a refresh keep you logged in instead of always
+  // bouncing back to the login page.
+  useEffect(() => {
+    const token = getStoredToken();
+    if (!token) {
+      setCheckingSession(false);
       return;
     }
 
-    setIsLoading(true);
-    setErrorMessage(null);
-    setTranscription("");
-    setSegments([]);
-    setMergedTranscript([]);
-    setSpeakerTranscript([]);
-    setSummary("");
-    setActionItems([]);
-    setDecisions([]);
-    setDeadlines([]);
-    setKeyTopics([]);
+    authFetch(`${API_BASE_URL}/auth/me`)
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Session expired.");
+        }
+        const user = (await response.json()) as AuthUser;
+        setCurrentUser(user);
+        setView("app");
+      })
+      .catch(() => {
+        clearStoredToken();
+      })
+      .finally(() => setCheckingSession(false));
+  }, []);
 
-    const formData = new FormData();
-    formData.append("file", selectedFile);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/transcribe`, {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // FastAPI's HTTPException responses put the message in `detail`.
-        throw new Error(data.detail || "Transcription failed.");
-      }
-
-      const result = data as TranscribeResponse;
-        setTranscription(result.text);
-        setSegments(result.segments);
-        setMergedTranscript(result.merged);
-        setSpeakerTranscript(result.transcript);
-        setSummary(result.summary);
-        setActionItems(result.action_items);
-        setDecisions(result.decisions);
-        setDeadlines(result.deadlines);
-        setKeyTopics(result.key_topics);
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Something went wrong while uploading.";
-      setErrorMessage(message);
-    } finally {
-      setIsLoading(false);
+  // Shared by both Login and Signup success handlers: store the token,
+  // then fetch the profile so the UI has the user's name/email.
+  const handleAuthSuccess = async (token: string) => {
+    storeToken(token);
+    const response = await authFetch(`${API_BASE_URL}/auth/me`);
+    if (response.ok) {
+      const user = (await response.json()) as AuthUser;
+      setCurrentUser(user);
     }
+    setView("app");
   };
 
-  return (
-    <div className="container">
-      <h1>Meeting Transcription (Whisper MVP)</h1>
+  const handleLogout = () => {
+    clearStoredToken();
+    setCurrentUser(null);
+    setView("login");
+  };
 
-      <div className="upload-card">
-        <form onSubmit={handleUpload}>
-          <input
-            type="file"
-            accept=".mp4,.mp3,.wav,.m4a"
-            onChange={handleFileChange}
-          />
-          <button type="submit" disabled={isLoading || !selectedFile}>
-            {isLoading ? "Transcribing..." : "Upload & Transcribe"}
-          </button>
-        </form>
-
-        {isLoading && (
-          <p className="status">
-            Processing audio with Whisper — this can take a bit for longer
-            recordings...
-          </p>
-        )}
-
-        {errorMessage && <p className="status error">{errorMessage}</p>}
-
-        <textarea
-          className="transcription-box"
-          placeholder="Transcription will appear here..."
-          value={transcription}
-          readOnly
-        />
-
-        {speakerTranscript.length > 0 && (
-        <div style={{ marginTop: "20px" }}>
-          <h2>Speaker Transcript</h2>
-
-          {speakerTranscript.map((entry, index) => (
-            <div
-              key={index}
-              style={{
-                border: "1px solid #ddd",
-                padding: "12px 14px",
-                marginBottom: "10px",
-                borderRadius: "8px",
-              }}
-            >
-              <strong>
-                {entry.speaker} — {entry.start.toFixed(2)}s → {entry.end.toFixed(2)}s
-              </strong>
-
-            <p style={{ marginBottom: 0 }}>{entry.text}</p>
-        </div>
-    ))}
-  </div>
-)}
-
-        {speakerTranscript.length > 0 && (
-        <div style={{ marginTop: "32px" }}>
-          <h2>Meeting Summary</h2>
-          <p>{summary || "No summary available."}</p>
-
-          <h2>Action Items</h2>
-          {actionItems.length === 0 ? (
-            <p className="status">No action items found.</p>
-          ) : (
-            actionItems.map((item, index) => (
-              <div
-                key={index}
-                style={{
-                  border: "1px solid #ddd",
-                  padding: "12px 14px",
-                  marginBottom: "10px",
-                  borderRadius: "8px",
-                }}
-              >
-                <p style={{ margin: "0 0 4px 0" }}>
-                  <strong>Owner:</strong> {item.owner || "Not specified"}
-                </p>
-                <p style={{ margin: "0 0 4px 0" }}>
-                  <strong>Task:</strong> {item.task}
-                </p>
-                <p style={{ margin: 0 }}>
-                  <strong>Deadline:</strong> {item.deadline || "Not specified"}
-                </p>
-              </div>
-            ))
-          )}
-
-          <h2>Decisions</h2>
-          {decisions.length === 0 ? (
-            <p className="status">No decisions found.</p>
-          ) : (
-            <ul>
-              {decisions.map((decision, index) => (
-                <li key={index}>{decision}</li>
-              ))}
-            </ul>
-          )}
-
-          <h2>Deadlines</h2>
-          {deadlines.length === 0 ? (
-            <p className="status">No deadlines found.</p>
-          ) : (
-            <ul>
-              {deadlines.map((deadline, index) => (
-                <li key={index}>{deadline}</li>
-              ))}
-            </ul>
-          )}
-
-          <h2>Key Topics</h2>
-          {keyTopics.length === 0 ? (
-            <p className="status">No key topics found.</p>
-          ) : (
-            <ul>
-              {keyTopics.map((topic, index) => (
-                <li key={index}>{topic}</li>
-              ))}
-            </ul>
-          )}
-        </div>
-        )}
-
-        {(mergedTranscript.length > 0 || segments.length > 0) && (
-        <details style={{ marginTop: "24px" }}>
-          <summary style={{ cursor: "pointer", color: "#555" }}>
-            Debug: raw per-segment output
-          </summary>
-
-          {mergedTranscript.length > 0 && (
-          <div style={{ marginTop: "16px" }}>
-            <h3>Merged (per Whisper segment, ungrouped)</h3>
-
-            {mergedTranscript.map((entry, index) => (
-              <div
-                key={index}
-                style={{
-                  border: "1px solid #eee",
-                  padding: "8px 10px",
-                  marginBottom: "6px",
-                  borderRadius: "6px",
-                  fontSize: "0.9rem",
-                }}
-              >
-                <strong>
-                  {entry.speaker} — {entry.start.toFixed(2)}s → {entry.end.toFixed(2)}s
-                </strong>
-                <p style={{ marginBottom: 0 }}>{entry.text}</p>
-              </div>
-            ))}
-          </div>
-          )}
-
-          {segments.length > 0 && (
-          <div style={{ marginTop: "16px" }}>
-            <h3>Whisper Segments (no speaker labels)</h3>
-
-            {segments.map((segment) => (
-              <div
-                key={segment.id}
-                style={{
-                  border: "1px solid #eee",
-                  padding: "8px 10px",
-                  marginBottom: "6px",
-                  borderRadius: "6px",
-                  fontSize: "0.9rem",
-                }}
-              >
-                <strong>
-                  {segment.start.toFixed(2)}s → {segment.end.toFixed(2)}s
-                </strong>
-                <p style={{ marginBottom: 0 }}>{segment.text}</p>
-              </div>
-            ))}
-          </div>
-          )}
-        </details>
-)}
-
+  if (checkingSession) {
+    return (
+      <div className="container">
+        <p className="status">Loading...</p>
       </div>
-    </div>
-  );
+    );
+  }
+
+  if (view === "login") {
+    return (
+      <Login
+        onLoginSuccess={handleAuthSuccess}
+        onSwitchToSignup={() => setView("signup")}
+      />
+    );
+  }
+
+  if (view === "signup") {
+    return (
+      <Signup
+        onSignupSuccess={handleAuthSuccess}
+        onSwitchToLogin={() => setView("login")}
+      />
+    );
+  }
+
+  return <Transcription currentUser={currentUser} onLogout={handleLogout} />;
 }
 
 export default App;

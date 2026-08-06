@@ -7,6 +7,7 @@ session.py, models live in app/models/.
 """
 
 import logging
+from app.config import require_database_url
 from functools import lru_cache
 
 from sqlalchemy import create_engine
@@ -34,6 +35,7 @@ def get_engine() -> Engine:
             config.require_database_url).
     """
     database_url = require_database_url()
+    print(database_url)
 
     logger.info("Creating database engine...")
     engine = create_engine(

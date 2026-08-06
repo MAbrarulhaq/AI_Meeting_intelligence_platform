@@ -55,3 +55,16 @@ langchain-google-genai==4.2.5
 sqlalchemy==2.0.51
 alembic==1.18.5
 psycopg[binary]==3.2.9
+
+
+# ==========================
+# Authentication (Phase 6)
+# bcrypt is called directly, NOT via passlib — passlib is unmaintained
+# and incompatible with every bcrypt release >=4.0 (removed the
+# __about__.__version__ attribute passlib's version detection reads).
+# See app/security/password.py for the full explanation.
+# email-validator is required for Pydantic's EmailStr type.
+# ==========================
+bcrypt==4.2.0
+python-jose[cryptography]==3.3.0
+email-validator==2.2.0

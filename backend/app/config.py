@@ -7,9 +7,9 @@ os.getenv() directly for these values.
 """
 
 import os
+from urllib.parse import quote_plus
 
 from dotenv import load_dotenv
-from urllib.parse import quote_plus
 
 load_dotenv()
 
@@ -20,7 +20,7 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # Configurable model name - never hardcoded in llm/model.py.
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 GEMINI_TEMPERATURE = float(os.getenv("GEMINI_TEMPERATURE", "0.2"))
 
@@ -40,7 +40,6 @@ def require_google_api_key() -> str:
             "(get a key from Google AI Studio)."
         )
     return GOOGLE_API_KEY
-
 
 
 # ---------------------------------------------------------------------
@@ -67,12 +66,11 @@ def _build_database_url() -> str | None:
         return None
     # postgresql+psycopg: uses the psycopg (v3) driver, per the spec's
     # preference over psycopg2.
-    user = quote_plus(DATABASE_USER)
-    password = quote_plus(DATABASE_PASSWORD)
-
     return (
-        f"postgresql+psycopg://{user}:{password}"
-        f"@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
+    f"postgresql+psycopg://"
+    f"{quote_plus(DATABASE_USER)}:"
+    f"{quote_plus(DATABASE_PASSWORD)}"
+    f"@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
     )
 
 
@@ -94,3 +92,30 @@ def require_database_url() -> str:
             "DATABASE_PASSWORD / DATABASE_PORT) in your backend/.env file."
         )
     return DATABASE_URL
+
+
+# ---------------------------------------------------------------------
+# JWT / authentication configuration (Phase 6)
+# ---------------------------------------------------------------------
+
+JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY")
+JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+JWT_EXPIRE_MINUTES = int(os.getenv("JWT_EXPIRE_MINUTES", "1440"))  # default 24h
+
+
+def require_jwt_secret_key() -> str:
+    """
+    Return the configured JWT signing secret, or raise a clear error if
+    it's missing.
+
+    Called lazily, from security/jwt.py, the first time a token is
+    actually created or decoded — so the rest of the app (Whisper,
+    PyAnnote, Gemini, unauthenticated routes) keeps working even if
+    this isn't configured yet.
+    """
+    if not JWT_SECRET_KEY:
+        raise RuntimeError(
+            "JWT_SECRET_KEY is not set. Add it to your backend/.env file "
+            "(use a long, random string — e.g. `openssl rand -hex 32`)."
+        )
+    return JWT_SECRET_KEY

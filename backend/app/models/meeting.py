@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional, TYPE_CHECKING
 
-from sqlalchemy import DateTime, Float, String, func
+from sqlalchemy import DateTime, Float, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from app.models.key_topic import KeyTopic
     from app.models.summary import Summary
     from app.models.transcript import Transcript
+    from app.models.user import User
 
 
 class Meeting(Base):
@@ -37,12 +38,15 @@ class Meeting(Base):
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     duration_seconds: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
-    # Reserved for Phase 6/7 authentication (nullable + indexed now, so
-    # a future "connect meetings to their owner" migration only needs
-    # to ADD a foreign-key constraint, not add the column itself).
-    # Not enforced or read anywhere yet.
-    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
-        UUID(as_uuid=True), nullable=True, index=True
+    # Phase 6.5: every meeting must belong to exactly one user. NOT
+    # NULL + a real FK now (was a nullable, unconstrained placeholder
+    # column through Phase 6 — see the Phase 6.5 migration for how
+    # existing NULL rows are handled).
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     created_at: Mapped[datetime] = mapped_column(
@@ -74,3 +78,4 @@ class Meeting(Base):
         back_populates="meeting", cascade="all, delete-orphan", passive_deletes=True,
         order_by="KeyTopic.created_at",
     )
+    user: Mapped["User"] = relationship(back_populates="meetings")

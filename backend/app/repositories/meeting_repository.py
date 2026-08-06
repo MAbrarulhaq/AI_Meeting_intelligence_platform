@@ -5,6 +5,13 @@ Pure data-access layer for the Meeting aggregate and its children.
 No business logic lives here, and no SQLAlchemy code lives outside
 this layer (or database/) anywhere else in the project.
 
+SECURITY: every read/delete method below takes user_id and filters
+on Meeting.user_id == user_id in the SQL itself (not as a Python
+post-filter). There is no method left that can return or delete a
+meeting without an owner check — see the Phase 6.6 security audit
+for the unscoped methods (list_meetings, and unfiltered get_meeting /
+delete_meeting) that used to live here and were removed.
+
 Transaction boundaries (commit/rollback) are NOT this repository's
 responsibility — that belongs to the service layer
 (services/persistence_service.py), which may combine several
@@ -40,6 +47,7 @@ class MeetingRepository:
 
     def create_meeting(
         self,
+        user_id: uuid.UUID,
         filename: str,
         duration_seconds: Optional[float],
         full_text: str,
@@ -57,9 +65,14 @@ class MeetingRepository:
         + all child rows) as ORM objects, add them to the session, and
         flush so generated columns (ids, server defaults) are populated.
 
+        Args:
+            user_id: the owning user's id. Mandatory — every meeting
+                belongs to exactly one user (see Meeting.user_id, a
+                NOT NULL foreign key as of Phase 6.5).
+
         Does NOT commit — the caller controls the transaction boundary.
         """
-        meeting = Meeting(filename=filename, duration_seconds=duration_seconds)
+        meeting = Meeting(user_id=user_id, filename=filename, duration_seconds=duration_seconds)
 
         meeting.transcript = Transcript(
             full_text=full_text,
@@ -86,16 +99,27 @@ class MeetingRepository:
         self.db.flush()  # populate meeting.id and all child ids/timestamps
         return meeting
 
-    def delete_meeting(self, meeting_id: uuid.UUID) -> bool:
+    def delete_meeting(self, meeting_id: uuid.UUID, user_id: uuid.UUID) -> bool:
         """
         Delete a meeting and everything attached to it (cascade, enforced
-        at the database level via ondelete="CASCADE" on every FK).
+        at the database level via ondelete="CASCADE" on every FK) —
+        but ONLY if it belongs to user_id.
+
+        Args:
+            user_id: the requesting user's id. The lookup is filtered
+                by BOTH meeting_id AND user_id in one query, so a
+                meeting belonging to someone else is indistinguishable
+                from a meeting that doesn't exist at all — this method
+                cannot delete another user's data no matter what
+                meeting_id is passed in.
 
         Returns:
-            True if a meeting was found and deleted, False if no meeting
-            with that id existed.
+            True if a matching, owned meeting was found and deleted,
+            False otherwise (either it doesn't exist, or it belongs
+            to a different user).
         """
-        meeting = self.db.get(Meeting, meeting_id)
+        stmt = select(Meeting).where(Meeting.id == meeting_id, Meeting.user_id == user_id)
+        meeting = self.db.execute(stmt).scalar_one_or_none()
         if meeting is None:
             return False
         self.db.delete(meeting)
@@ -106,14 +130,20 @@ class MeetingRepository:
     # Reads
     # -------------------------------------------------------------
 
-    def list_meetings(self, limit: int = 50, offset: int = 0) -> List[Meeting]:
+    def get_meetings_for_user(
+        self, user_id: uuid.UUID, limit: int = 50, offset: int = 0
+    ) -> List[Meeting]:
         """
-        Return meetings newest-first, with their summary eagerly loaded
-        (list views need the summary preview but not the full transcript
-        or every child row).
+        Return one user's meetings, newest-first, with their summary
+        eagerly loaded (list views need the summary preview but not
+        the full transcript or every child row).
+
+        This is the ONLY listing method in this repository — there is
+        no unscoped "all meetings" query anywhere in this class.
         """
         stmt = (
             select(Meeting)
+            .where(Meeting.user_id == user_id)
             .options(selectinload(Meeting.summary))
             .order_by(Meeting.created_at.desc())
             .limit(limit)
@@ -121,15 +151,27 @@ class MeetingRepository:
         )
         return list(self.db.execute(stmt).scalars().all())
 
-    def get_meeting(self, meeting_id: uuid.UUID) -> Optional[Meeting]:
+    def get_meeting_for_user(
+        self, meeting_id: uuid.UUID, user_id: uuid.UUID
+    ) -> Optional[Meeting]:
         """
         Return one meeting with every related row eagerly loaded in a
         single query (selectinload avoids the N+1 problem across the
-        five separate child collections).
+        five separate child collections) — but ONLY if it belongs to
+        user_id.
+
+        Args:
+            user_id: the requesting user's id. Filtered in the SQL
+                itself alongside meeting_id, so a meeting belonging to
+                someone else returns None here — exactly the same as
+                a meeting_id that doesn't exist. Callers should turn
+                None into a 404, never a 403, so an attacker probing
+                meeting ids can't distinguish "not yours" from
+                "doesn't exist".
         """
         stmt = (
             select(Meeting)
-            .where(Meeting.id == meeting_id)
+            .where(Meeting.id == meeting_id, Meeting.user_id == user_id)
             .options(
                 selectinload(Meeting.transcript),
                 selectinload(Meeting.summary),
@@ -139,14 +181,4 @@ class MeetingRepository:
                 selectinload(Meeting.key_topics),
             )
         )
-        return self.db.execute(stmt).scalar_one_or_none()
-
-    def get_transcript(self, meeting_id: uuid.UUID) -> Optional[Transcript]:
-        """Return just the transcript row for one meeting, if it exists."""
-        stmt = select(Transcript).where(Transcript.meeting_id == meeting_id)
-        return self.db.execute(stmt).scalar_one_or_none()
-
-    def get_summary(self, meeting_id: uuid.UUID) -> Optional[Summary]:
-        """Return just the summary row for one meeting, if it exists."""
-        stmt = select(Summary).where(Summary.meeting_id == meeting_id)
         return self.db.execute(stmt).scalar_one_or_none()

@@ -10,6 +10,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.auth import router as auth_router
 from app.api.meetings import router as meetings_router
 from app.api.transcribe import router as transcribe_router
 
@@ -31,6 +32,7 @@ app.add_middleware(
 
 app.include_router(transcribe_router)
 app.include_router(meetings_router)
+app.include_router(auth_router)
 
 
 @app.get("/")

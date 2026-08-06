@@ -8,11 +8,14 @@ the transcription service, and cleaning up afterwards.
 
 import os
 import uuid
-import traceback
 from pathlib import Path
 
-from fastapi import APIRouter, UploadFile, File, HTTPException
+from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
+from sqlalchemy.orm import Session
 
+from app.database.session import get_db
+from app.models.user import User
+from app.security.dependencies import get_current_user
 from app.services.transcription_service import transcribe_audio
 from app.services.diarization_service import diarize_audio
 from app.services.transcript_service import (
@@ -21,6 +24,7 @@ from app.services.transcript_service import (
     print_merged_transcript,
 )
 from app.services.meeting_service import generate_meeting_intelligence
+from app.services import persistence_service
 
 router = APIRouter()
 
@@ -49,11 +53,16 @@ def _validate_file_extension(filename: str) -> str:
 
 
 @router.post("/transcribe")
-async def transcribe_endpoint(file: UploadFile = File(...)):
+async def transcribe_endpoint(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
     Accept an uploaded meeting recording, transcribe it with Whisper,
     diarize it with PyAnnote, merge both into a speaker-labelled
-    transcript, and return everything.
+    transcript, generate meeting intelligence, and persist everything
+    under the authenticated user's ownership.
     """
     if not file.filename:
         raise HTTPException(status_code=400, detail="No file was uploaded.")
@@ -97,8 +106,30 @@ async def transcribe_endpoint(file: UploadFile = File(...)):
         # same pattern as the Whisper/PyAnnote error handling.
         meeting_intelligence = generate_meeting_intelligence(speaker_transcript)
 
+        # Phase 5: persist everything to PostgreSQL. Derived from the
+        # last Whisper segment's end timestamp since we don't probe the
+        # file for duration separately. RuntimeError -> 500 below, same
+        # pattern as every other service — a failed save is a failed
+        # request, not a silently dropped one.
+        duration_seconds = whisper_segments[-1]["end"] if whisper_segments else None
+        # Phase 6.5: every meeting must belong to exactly one user.
+        # current_user comes from the get_current_user dependency above
+        # (already verified/decoded) — no token handling happens here.
+        meeting_id = persistence_service.save_meeting(
+            db=db,
+            user_id=current_user.id,
+            filename=file.filename,
+            duration_seconds=duration_seconds,
+            full_text=transcription["text"],
+            whisper_segments=whisper_segments,
+            speaker_segments=speaker_segments,
+            speaker_transcript=speaker_transcript,
+            meeting_intelligence=meeting_intelligence,
+        )
+
         return {
             "status": "success",
+            "meeting_id": meeting_id,
             "text": transcription["text"],
             "segments": whisper_segments,
             "speakers": speaker_segments,
@@ -118,11 +149,10 @@ async def transcribe_endpoint(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(exc))
 
     except Exception as exc:
-        traceback.print_exc()
         raise HTTPException(
             status_code=500,
-            detail=str(exc),
-    )
+            detail=f"Unexpected error: {exc}"
+        )
 
     finally:
         if temp_path.exists():

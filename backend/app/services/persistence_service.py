@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 def save_meeting(
     db: Session,
+    user_id: uuid.UUID,
     filename: str,
     duration_seconds: Optional[float],
     full_text: str,
@@ -42,6 +43,12 @@ def save_meeting(
     Persist one fully-processed meeting (transcript + AI intelligence)
     as a single transaction. Either everything is saved, or nothing is.
 
+    Args:
+        user_id: the authenticated user's id (from current_user.id in
+            the route). Mandatory as of Phase 6.5 — Meeting.user_id is
+            a NOT NULL foreign key, so every meeting must have an
+            owner; there is no "unowned" meeting anymore.
+
     Returns:
         The new meeting's id.
 
@@ -53,6 +60,7 @@ def save_meeting(
 
     try:
         meeting = repo.create_meeting(
+            user_id=user_id,
             filename=filename,
             duration_seconds=duration_seconds,
             full_text=full_text,
@@ -66,7 +74,7 @@ def save_meeting(
             key_topics=meeting_intelligence["key_topics"],
         )
         db.commit()
-        logger.info("Meeting saved (id=%s, filename=%s)", meeting.id, filename)
+        logger.info("Meeting saved (id=%s, user_id=%s, filename=%s)", meeting.id, user_id, filename)
         return meeting.id
 
     except IntegrityError as exc:
@@ -88,13 +96,23 @@ def save_meeting(
         raise RuntimeError(f"Failed to save the meeting to the database: {exc}") from exc
 
 
-def list_meetings(db: Session, limit: int = 50, offset: int = 0) -> List[MeetingListItem]:
-    """Return the meeting history list, newest first."""
+def list_meetings(
+    db: Session, user_id: uuid.UUID, limit: int = 50, offset: int = 0
+) -> List[MeetingListItem]:
+    """
+    Return one user's meeting history list, newest first.
+
+    Args:
+        user_id: the authenticated user's id. Mandatory — this always
+            queries via MeetingRepository.get_meetings_for_user(), the
+            only listing method the repository exposes. There is no
+            way to call this function and get another user's meetings.
+    """
     repo = MeetingRepository(db)
     try:
-        meetings = repo.list_meetings(limit=limit, offset=offset)
+        meetings = repo.get_meetings_for_user(user_id=user_id, limit=limit, offset=offset)
     except SQLAlchemyError as exc:
-        logger.error("Failed to list meetings")
+        logger.error("Failed to list meetings for user %s", user_id)
         raise RuntimeError(f"Failed to load meeting history: {exc}") from exc
 
     return [
@@ -111,16 +129,29 @@ def list_meetings(db: Session, limit: int = 50, offset: int = 0) -> List[Meeting
     ]
 
 
-def get_meeting_detail(db: Session, meeting_id: uuid.UUID) -> Optional[MeetingDetail]:
+def get_meeting_detail(
+    db: Session, meeting_id: uuid.UUID, user_id: uuid.UUID
+) -> Optional[MeetingDetail]:
     """
-    Return the full detail payload for one meeting, or None if it
-    doesn't exist (the route turns that into a 404).
+    Return the full detail payload for one meeting — but ONLY if it
+    belongs to user_id.
+
+    Args:
+        user_id: the authenticated user's id. Passed straight into
+            MeetingRepository.get_meeting_for_user(), which filters by
+            both meeting_id and user_id in the SQL itself.
+
+    Returns:
+        None if the meeting doesn't exist OR belongs to a different
+        user — the two cases are indistinguishable on purpose, so the
+        route always responds 404 rather than confirming another
+        user's meeting exists via a 403.
     """
     repo = MeetingRepository(db)
     try:
-        meeting: Optional[Meeting] = repo.get_meeting(meeting_id)
+        meeting: Optional[Meeting] = repo.get_meeting_for_user(meeting_id, user_id)
     except SQLAlchemyError as exc:
-        logger.error("Failed to load meeting %s", meeting_id)
+        logger.error("Failed to load meeting %s for user %s", meeting_id, user_id)
         raise RuntimeError(f"Failed to load meeting: {exc}") from exc
 
     if meeting is None:
@@ -154,24 +185,33 @@ def get_meeting_detail(db: Session, meeting_id: uuid.UUID) -> Optional[MeetingDe
     )
 
 
-def delete_meeting(db: Session, meeting_id: uuid.UUID) -> bool:
+def delete_meeting(db: Session, meeting_id: uuid.UUID, user_id: uuid.UUID) -> bool:
     """
-    Delete a meeting and everything attached to it (cascade).
+    Delete a meeting and everything attached to it (cascade) — but
+    ONLY if it belongs to user_id.
+
+    Args:
+        user_id: the authenticated user's id. Passed straight into
+            MeetingRepository.delete_meeting(), which only deletes a
+            row matching BOTH meeting_id and user_id.
 
     Returns:
-        True if deleted, False if no meeting with that id existed.
+        True if deleted. False if no meeting with that id existed, OR
+        it exists but belongs to a different user — deliberately the
+        same result for both, so the route can't leak which case it
+        was via a different status code.
 
     Raises:
         RuntimeError: on database failure. Rolled back before raising.
     """
     repo = MeetingRepository(db)
     try:
-        deleted = repo.delete_meeting(meeting_id)
+        deleted = repo.delete_meeting(meeting_id, user_id)
         db.commit()
         if deleted:
-            logger.info("Meeting deleted (id=%s)", meeting_id)
+            logger.info("Meeting deleted (id=%s, user_id=%s)", meeting_id, user_id)
         return deleted
     except SQLAlchemyError as exc:
         db.rollback()
-        logger.error("Failed to delete meeting %s", meeting_id)
+        logger.error("Failed to delete meeting %s for user %s", meeting_id, user_id)
         raise RuntimeError(f"Failed to delete meeting: {exc}") from exc
