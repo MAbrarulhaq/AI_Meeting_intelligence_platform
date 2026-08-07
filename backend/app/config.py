@@ -7,7 +7,6 @@ os.getenv() directly for these values.
 """
 
 import os
-from urllib.parse import quote_plus
 
 from dotenv import load_dotenv
 
@@ -67,10 +66,8 @@ def _build_database_url() -> str | None:
     # postgresql+psycopg: uses the psycopg (v3) driver, per the spec's
     # preference over psycopg2.
     return (
-    f"postgresql+psycopg://"
-    f"{quote_plus(DATABASE_USER)}:"
-    f"{quote_plus(DATABASE_PASSWORD)}"
-    f"@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
+        f"postgresql+psycopg://{DATABASE_USER}:{DATABASE_PASSWORD}"
+        f"@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
     )
 
 
@@ -119,3 +116,28 @@ def require_jwt_secret_key() -> str:
             "(use a long, random string — e.g. `openssl rand -hex 32`)."
         )
     return JWT_SECRET_KEY
+
+
+# ---------------------------------------------------------------------
+# RAG / Vector store configuration (Phase 7)
+# ---------------------------------------------------------------------
+
+# Gemini's embedding model, used only for turning text into vectors -
+# distinct from GEMINI_MODEL above, which generates chat/JSON answers.
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "gemini-embedding-001")
+
+# Local, on-disk ChromaDB store. A PersistentClient (not a separate
+# Chroma server) keeps this consistent with the project's local-dev-
+# friendly setup elsewhere (e.g. PostgreSQL is the only external
+# service actually required to run this app).
+CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_data")
+
+# Chunk sizing for the RAG index (distinct from services/chunking_service.py,
+# which chunks for Gemini's Map-Reduce summarization with different,
+# larger targets and no overlap - these two chunkers serve different
+# purposes and are intentionally not shared).
+RAG_CHUNK_TARGET_TOKENS = int(os.getenv("RAG_CHUNK_TARGET_TOKENS", "900"))
+RAG_CHUNK_OVERLAP_TOKENS = int(os.getenv("RAG_CHUNK_OVERLAP_TOKENS", "125"))
+
+# How many chunks to retrieve per chat question.
+RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))

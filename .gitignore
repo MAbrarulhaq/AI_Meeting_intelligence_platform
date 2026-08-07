@@ -35,3 +35,4 @@ build/
 
 # Python cache
 .pytest_cache/
+backend/chroma_data/

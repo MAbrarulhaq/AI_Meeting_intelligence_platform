@@ -68,3 +68,10 @@ psycopg[binary]==3.2.9
 bcrypt==4.2.0
 python-jose[cryptography]==3.3.0
 email-validator==2.2.0
+
+
+# ==========================
+# RAG Chatbot (Phase 7)
+# Local persistent Chroma store - no separate server process needed.
+# ==========================
+chromadb==1.5.9

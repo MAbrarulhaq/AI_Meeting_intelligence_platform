@@ -24,6 +24,7 @@ from app.schemas.meeting_schemas import (
     TranscriptOut,
     build_summary_preview,
 )
+from app.services import vector_store_service
 
 logger = logging.getLogger(__name__)
 
@@ -210,6 +211,20 @@ def delete_meeting(db: Session, meeting_id: uuid.UUID, user_id: uuid.UUID) -> bo
         db.commit()
         if deleted:
             logger.info("Meeting deleted (id=%s, user_id=%s)", meeting_id, user_id)
+            # Phase 7: also remove this meeting's vectors so the
+            # chatbot can never retrieve or cite a deleted meeting.
+            # Best-effort — the PostgreSQL delete already committed and
+            # is the source of truth; a Chroma cleanup failure here is
+            # logged, not raised, so it can't undo an already-successful
+            # deletion or turn it into a 500 for the user.
+            try:
+                vector_store_service.delete_meeting_chunks(meeting_id)
+            except Exception:
+                logger.exception(
+                    "Failed to delete Chroma chunks for meeting %s "
+                    "(PostgreSQL deletion already succeeded).",
+                    meeting_id,
+                )
         return deleted
     except SQLAlchemyError as exc:
         db.rollback()

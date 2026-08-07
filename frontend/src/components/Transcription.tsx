@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, ChangeEvent, FormEvent } from "react";
 import { authFetch } from "../auth";
+import ChatAssistant from "./ChatAssistant";
 
 // Backend base URL. Hardcoded for the MVP since there's only one
 // environment to worry about (local dev).
@@ -594,6 +595,12 @@ function Transcription({ currentUser, onLogout }: TranscriptionProps) {
           </div>
         )}
       </div>
+
+      {/* ============================================================
+          AI Meeting Assistant (Phase 7 — RAG chatbot)
+          ============================================================ */}
+      <h2 style={{ marginTop: "40px" }}>AI Meeting Assistant</h2>
+      <ChatAssistant meetings={meetings.map((m) => ({ id: m.id, filename: m.filename }))} />
     </div>
   );
 }
