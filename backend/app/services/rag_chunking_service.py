@@ -56,8 +56,10 @@ def chunk_transcript_for_indexing(
 
     Returns:
         List of {"chunk_number": int, "text": str, "start_time": float,
-        "end_time": float}, in chronological order. Empty list if the
-        transcript has no usable text.
+        "end_time": float, "speaker": str}, in chronological order.
+        "speaker" is every distinct speaker label present in that
+        chunk, comma-joined (a chunk usually spans several turns).
+        Empty list if the transcript has no usable text.
     """
     turns = [t for t in speaker_transcript if t.get("text", "").strip()]
     if not turns:
@@ -74,12 +76,22 @@ def chunk_transcript_for_indexing(
         if not current_turns:
             return
         text = "\n".join(_turn_text(t) for t in current_turns)
+        # A chunk spans multiple speaker turns, so "speaker" here is
+        # every distinct speaker present in it (order of first
+        # appearance), not a single label — joined into one string
+        # since Chroma metadata values must be scalars, not lists.
+        speakers_in_chunk: List[str] = []
+        for t in current_turns:
+            label = t.get("speaker", "UNKNOWN")
+            if label not in speakers_in_chunk:
+                speakers_in_chunk.append(label)
         chunks.append(
             {
                 "chunk_number": len(chunks) + 1,
                 "text": text,
                 "start_time": current_turns[0]["start"],
                 "end_time": current_turns[-1]["end"],
+                "speaker": ", ".join(speakers_in_chunk),
             }
         )
 

@@ -3,6 +3,11 @@ import { authFetch } from "../auth";
 
 const API_BASE_URL = "http://localhost:8000";
 
+// Matches the backend's default RAG_HISTORY_MAX_EXCHANGES — trimming
+// here too keeps the request small, though the backend enforces its
+// own cap regardless of what's sent.
+const MAX_HISTORY_EXCHANGES = 4;
+
 interface MeetingOption {
   id: string;
   filename: string;
@@ -56,6 +61,13 @@ function ChatAssistant({ meetings }: ChatAssistantProps) {
     setInput("");
     setIsSending(true);
 
+    // Send only the last few exchanges as history — the messages
+    // already in state BEFORE this new question, trimmed to the most
+    // recent MAX_HISTORY_EXCHANGES user+assistant pairs.
+    const historyToSend = messages
+      .slice(-MAX_HISTORY_EXCHANGES * 2)
+      .map((m) => ({ role: m.role, content: m.text }));
+
     try {
       const response = await authFetch(`${API_BASE_URL}/chat`, {
         method: "POST",
@@ -63,6 +75,7 @@ function ChatAssistant({ meetings }: ChatAssistantProps) {
         body: JSON.stringify({
           question,
           meeting_id: scopeMeetingId || null,
+          history: historyToSend,
         }),
       });
 

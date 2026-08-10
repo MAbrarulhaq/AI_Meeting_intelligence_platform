@@ -1,4 +1,7 @@
 import { useState, FormEvent } from "react";
+import Button from "./ui/Button";
+import { Field, PasswordField } from "./ui/Input";
+import WaveformMark from "./ui/WaveformMark";
 
 const API_BASE_URL = "http://localhost:8000";
 
@@ -32,56 +35,78 @@ function Login({ onLoginSuccess, onSwitchToSignup }: LoginProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.detail || "Login failed.");
+        throw new Error(data.detail || "Login failed. Check your email and password.");
       }
 
       const result = data as TokenResponse;
       onLoginSuccess(result.access_token);
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Login failed.");
+      setErrorMessage(
+        err instanceof Error ? err.message : "Login failed. Check your email and password."
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="container">
-      <h1>Log In</h1>
-      <div className="upload-card">
-        <form onSubmit={handleSubmit}>
-          <label style={{ display: "block", marginBottom: "12px" }}>
-            Email
-            <input
+    <div className="auth-shell">
+      <aside className="auth-brand" aria-hidden="true">
+        <div className="auth-brand-name">Meridian</div>
+        <div className="auth-brand-copy">
+          <h2>Every meeting, turned into something you can act on.</h2>
+          <p>
+            Transcripts, speakers, decisions, and action items — organized automatically, so
+            nothing said in a meeting gets lost after it ends.
+          </p>
+          <WaveformMark
+            color="rgba(255,255,255,0.85)"
+            className="auth-brand-mark"
+          />
+        </div>
+        <div className="auth-brand-foot">meeting intelligence platform</div>
+      </aside>
+
+      <div className="auth-form-panel">
+        <div className="auth-form-inner">
+          <h1>Log in</h1>
+          <p className="auth-form-sub">Welcome back. Enter your details to continue.</p>
+
+          <form onSubmit={handleSubmit} noValidate>
+            <Field
+              label="Email"
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              style={{ display: "block", width: "100%", padding: "8px", marginTop: "4px", boxSizing: "border-box" }}
             />
-          </label>
-          <label style={{ display: "block", marginBottom: "12px" }}>
-            Password
-            <input
-              type="password"
+            <PasswordField
+              label="Password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              style={{ display: "block", width: "100%", padding: "8px", marginTop: "4px", boxSizing: "border-box" }}
             />
-          </label>
-          <button type="submit" disabled={isLoading}>
-            {isLoading ? "Logging in..." : "Log In"}
-          </button>
-        </form>
 
-        {errorMessage && <p className="status error">{errorMessage}</p>}
+            <Button type="submit" block disabled={isLoading}>
+              {isLoading ? "Logging in…" : "Log in"}
+            </Button>
+          </form>
 
-        <p style={{ marginTop: "16px" }}>
-          Don't have an account?{" "}
-          <button type="button" onClick={onSwitchToSignup}>
-            Sign Up
-          </button>
-        </p>
+          {errorMessage && (
+            <div className="callout-error" role="alert">
+              {errorMessage}
+            </div>
+          )}
+
+          <p className="auth-switch">
+            Don't have an account?{" "}
+            <button type="button" className="auth-switch-link" onClick={onSwitchToSignup}>
+              Sign up
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );

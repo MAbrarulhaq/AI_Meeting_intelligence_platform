@@ -139,5 +139,13 @@ CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_data")
 RAG_CHUNK_TARGET_TOKENS = int(os.getenv("RAG_CHUNK_TARGET_TOKENS", "900"))
 RAG_CHUNK_OVERLAP_TOKENS = int(os.getenv("RAG_CHUNK_OVERLAP_TOKENS", "125"))
 
-# How many chunks to retrieve per chat question.
-RAG_TOP_K = int(os.getenv("RAG_TOP_K", "5"))
+# How many documents to retrieve per chat question (transcript chunks
+# + summary/action-item/decision/deadline/key-topic documents
+# combined). Configurable via env — RAG_TOP_K=8 by default.
+RAG_TOP_K = int(os.getenv("RAG_TOP_K", "8"))
+
+# Conversation memory: how many prior USER+ASSISTANT exchanges to
+# retain and pass to Gemini for follow-up questions. Enforced
+# server-side (truncated here regardless of how much history the
+# client sends) — see services/chat_service.py.
+RAG_HISTORY_MAX_EXCHANGES = int(os.getenv("RAG_HISTORY_MAX_EXCHANGES", "4"))

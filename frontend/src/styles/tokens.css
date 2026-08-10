@@ -1,0 +1,105 @@
+/* ==========================================================================
+   Design tokens — AI Meeting Intelligence Platform
+   ==========================================================================
+   One place to change the palette, type scale, spacing, and shadows.
+   Everything else in the app should reference these variables rather
+   than hardcoding values.
+
+   Palette
+   -------
+   --ink        #14171C  primary text
+   --ink-soft   #565D6B  secondary text / captions
+   --ink-faint  #8A90A0  placeholders, disabled text
+   --paper      #F6F6F3  app background (cool off-white, not cream)
+   --surface    #FFFFFF  card / panel background
+   --line       #E4E4DF  hairline borders
+   --line-soft  #EDEDE8  subtler dividers
+   --accent     #1E4A44  deep teal — primary brand color (calm, focused)
+   --accent-ink #0F2E2A  accent text-on-light / hover state
+   --accent-soft #E7EEEC tinted backgrounds for accent elements
+   --signal     #B5762A  warm amber — used ONLY for things that need
+                         attention: deadlines, overdue items, warnings
+   --signal-soft #F5EBDC tinted background for signal elements
+   --danger     #B23B3B  errors
+   --danger-soft #FBEAEA error backgrounds
+
+   Typography
+   ----------
+   Display: "Archivo"      — headlines, product name, section titles
+   Body:    "Inter"        — paragraphs, labels, UI copy
+   Mono:    "IBM Plex Mono" — timestamps, durations, meeting IDs, counts
+   ========================================================================== */
+
+@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap");
+
+:root {
+  /* Color */
+  --ink: #14171c;
+  --ink-soft: #565d6b;
+  --ink-faint: #8a90a0;
+  --paper: #f6f6f3;
+  --surface: #ffffff;
+  --line: #e4e4df;
+  --line-soft: #ededE8;
+  --accent: #1e4a44;
+  --accent-ink: #0f2e2a;
+  --accent-soft: #e7eeec;
+  --signal: #b5762a;
+  --signal-soft: #f5ebdc;
+  --danger: #b23b3b;
+  --danger-soft: #fbeaea;
+
+  /* Type */
+  --font-display: "Archivo", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1.0625rem;
+  --text-lg: 1.375rem;
+  --text-xl: 1.875rem;
+  --text-2xl: 2.5rem;
+  --text-3xl: 3.25rem;
+
+  /* Spacing (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-20: 80px;
+
+  /* Radius — restrained, not pill-shaped */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  /* Shadow — one soft elevation, used sparingly */
+  --shadow-sm: 0 1px 2px rgba(20, 23, 28, 0.06);
+  --shadow-md: 0 4px 16px rgba(20, 23, 28, 0.08);
+
+  /* Layout */
+  --content-width: 1120px;
+  --sidebar-width: 240px;
+
+  /* Motion */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

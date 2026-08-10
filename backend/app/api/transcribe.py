@@ -128,16 +128,18 @@ async def transcribe_endpoint(
             meeting_intelligence=meeting_intelligence,
         )
 
-        # Phase 7.3: index the transcript into ChromaDB for the RAG
-        # chatbot, ONLY after the PostgreSQL save above succeeded.
-        # index_meeting_transcript never raises (failures are logged
-        # internally) — an indexing failure must never fail this
-        # request or lose the meeting data already saved above.
+        # Phase 7.3 (+ addendum): index the transcript AND the meeting
+        # intelligence into ChromaDB for the RAG chatbot, ONLY after
+        # the PostgreSQL save above succeeded. index_meeting_transcript
+        # never raises (failures are logged internally) — an indexing
+        # failure must never fail this request or lose the meeting
+        # data already saved above.
         index_meeting_transcript(
             meeting_id=meeting_id,
             user_id=current_user.id,
             filename=file.filename,
             speaker_transcript=speaker_transcript,
+            meeting_intelligence=meeting_intelligence,
         )
 
         return {

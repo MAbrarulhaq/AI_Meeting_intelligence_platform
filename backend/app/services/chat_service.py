@@ -8,10 +8,10 @@ the response — including source citations — for the API layer.
 
 import logging
 import uuid
-from typing import Optional
+from typing import List, Optional
 
-from app.config import RAG_TOP_K
-from app.schemas.chat_schemas import ChatResponse, ChatSource
+from app.config import RAG_HISTORY_MAX_EXCHANGES, RAG_TOP_K
+from app.schemas.chat_schemas import ChatHistoryMessage, ChatResponse, ChatSource
 from app.services import rag_service
 
 logger = logging.getLogger(__name__)
@@ -29,10 +29,24 @@ def _distance_to_confidence(distance: Optional[float]) -> Optional[float]:
     return round(max(0.0, min(1.0, 1.0 - distance)), 3)
 
 
+def _truncate_history(history: List[ChatHistoryMessage]) -> List[dict]:
+    """
+    Keep only the last RAG_HISTORY_MAX_EXCHANGES exchanges (one
+    exchange = one user turn + one assistant turn = 2 messages),
+    regardless of how much history the client sent. Enforced here,
+    server-side, so conversation memory can't grow the prompt
+    unboundedly no matter what the frontend does.
+    """
+    max_messages = RAG_HISTORY_MAX_EXCHANGES * 2
+    trimmed = history[-max_messages:] if max_messages > 0 else []
+    return [{"role": turn.role, "content": turn.content} for turn in trimmed]
+
+
 def answer_question(
     user_id: uuid.UUID,
     question: str,
     meeting_id: Optional[uuid.UUID] = None,
+    history: Optional[List[ChatHistoryMessage]] = None,
 ) -> ChatResponse:
     """
     Answer one chat question, scoped entirely to user_id.
@@ -47,6 +61,10 @@ def answer_question(
             returns zero chunks (see vector_store_service.query_chunks)
             — never another user's content, and no error that would
             reveal whether that meeting id exists.
+        history: recent prior turns from the frontend, oldest first.
+            Truncated to the last RAG_HISTORY_MAX_EXCHANGES exchanges
+            here regardless of how much is sent — conversation memory
+            is capped server-side, not just by frontend convention.
 
     Returns:
         ChatResponse with the answer and its source citations. If no
@@ -58,6 +76,8 @@ def answer_question(
             (e.g. Chroma unavailable, Gemini error). The route turns
             this into an HTTP error.
     """
+    trimmed_history = _truncate_history(history or [])
+
     try:
         chunks = rag_service.retrieve_relevant_chunks(
             question=question, user_id=user_id, meeting_id=meeting_id, top_k=RAG_TOP_K
@@ -72,7 +92,7 @@ def answer_question(
         logger.info("No relevant chunks found for user %s", user_id)
         return ChatResponse(answer=rag_service.NO_CONTEXT_ANSWER, sources=[])
 
-    answer = rag_service.generate_answer(question, chunks)
+    answer = rag_service.generate_answer(question, chunks, history=trimmed_history)
 
     sources = [
         ChatSource(

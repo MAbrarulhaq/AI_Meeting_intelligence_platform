@@ -30,6 +30,7 @@ def chat(payload: ChatRequest, current_user: User = Depends(get_current_user)):
             user_id=current_user.id,
             question=payload.question,
             meeting_id=payload.meeting_id,
+            history=payload.history,
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc))

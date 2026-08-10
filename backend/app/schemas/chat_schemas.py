@@ -5,9 +5,16 @@ Pydantic request/response models for the RAG chatbot endpoint.
 """
 
 import uuid
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field
+
+
+class ChatHistoryMessage(BaseModel):
+    """One prior turn in the conversation, sent by the frontend for follow-up questions."""
+
+    role: Literal["user", "assistant"]
+    content: str = Field(max_length=2000)
 
 
 class ChatRequest(BaseModel):
@@ -18,6 +25,11 @@ class ChatRequest(BaseModel):
     meeting_id: Optional[uuid.UUID] = Field(
         default=None,
         description="If set, restrict the search to this one meeting instead of all of the user's meetings.",
+    )
+    history: List[ChatHistoryMessage] = Field(
+        default_factory=list,
+        description="Recent prior turns, oldest first. Truncated server-side to the last "
+        "RAG_HISTORY_MAX_EXCHANGES exchanges regardless of how much is sent here.",
     )
 
 

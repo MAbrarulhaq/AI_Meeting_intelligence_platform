@@ -1,4 +1,7 @@
 import { useState, FormEvent } from "react";
+import Button from "./ui/Button";
+import { Field, PasswordField } from "./ui/Input";
+import WaveformMark from "./ui/WaveformMark";
 
 const API_BASE_URL = "http://localhost:8000";
 
@@ -11,14 +14,6 @@ interface TokenResponse {
   access_token: string;
   token_type: string;
 }
-
-const fieldStyle: React.CSSProperties = {
-  display: "block",
-  width: "100%",
-  padding: "8px",
-  marginTop: "4px",
-  boxSizing: "border-box",
-};
 
 function Signup({ onSignupSuccess, onSwitchToLogin }: SignupProps) {
   const [fullName, setFullName] = useState("");
@@ -34,6 +29,10 @@ function Signup({ onSignupSuccess, onSwitchToLogin }: SignupProps) {
 
     if (!fullName.trim() || !email.trim() || !password || !confirmPassword) {
       setErrorMessage("All fields are required.");
+      return;
+    }
+    if (password.length < 8) {
+      setErrorMessage("Password must be at least 8 characters.");
       return;
     }
     if (password !== confirmPassword) {
@@ -64,64 +63,77 @@ function Signup({ onSignupSuccess, onSwitchToLogin }: SignupProps) {
   };
 
   return (
-    <div className="container">
-      <h1>Sign Up</h1>
-      <div className="upload-card">
-        <form onSubmit={handleSubmit}>
-          <label style={{ display: "block", marginBottom: "12px" }}>
-            Full Name
-            <input
+    <div className="auth-shell">
+      <aside className="auth-brand" aria-hidden="true">
+        <div className="auth-brand-name">Meridian</div>
+        <div className="auth-brand-copy">
+          <h2>Stop re-reading meetings to find what was decided.</h2>
+          <p>
+            Upload a recording and get a searchable transcript, a summary, and every action item,
+            decision, and deadline — pulled out automatically.
+          </p>
+          <WaveformMark color="rgba(255,255,255,0.85)" className="auth-brand-mark" />
+        </div>
+        <div className="auth-brand-foot">meeting intelligence platform</div>
+      </aside>
+
+      <div className="auth-form-panel">
+        <div className="auth-form-inner">
+          <h1>Create your account</h1>
+          <p className="auth-form-sub">Start turning meetings into a searchable record.</p>
+
+          <form onSubmit={handleSubmit} noValidate>
+            <Field
+              label="Full name"
               type="text"
+              autoComplete="name"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               required
-              style={fieldStyle}
             />
-          </label>
-          <label style={{ display: "block", marginBottom: "12px" }}>
-            Email
-            <input
+            <Field
+              label="Email"
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              style={fieldStyle}
             />
-          </label>
-          <label style={{ display: "block", marginBottom: "12px" }}>
-            Password
-            <input
-              type="password"
+            <PasswordField
+              label="Password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required
               minLength={8}
-              style={fieldStyle}
+              hint="At least 8 characters."
+              required
             />
-          </label>
-          <label style={{ display: "block", marginBottom: "12px" }}>
-            Confirm Password
-            <input
-              type="password"
+            <PasswordField
+              label="Confirm password"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              style={fieldStyle}
             />
-          </label>
-          <button type="submit" disabled={isLoading}>
-            {isLoading ? "Signing up..." : "Sign Up"}
-          </button>
-        </form>
 
-        {errorMessage && <p className="status error">{errorMessage}</p>}
+            <Button type="submit" block disabled={isLoading}>
+              {isLoading ? "Creating account…" : "Create account"}
+            </Button>
+          </form>
 
-        <p style={{ marginTop: "16px" }}>
-          Already have an account?{" "}
-          <button type="button" onClick={onSwitchToLogin}>
-            Log In
-          </button>
-        </p>
+          {errorMessage && (
+            <div className="callout-error" role="alert">
+              {errorMessage}
+            </div>
+          )}
+
+          <p className="auth-switch">
+            Already have an account?{" "}
+            <button type="button" className="auth-switch-link" onClick={onSwitchToLogin}>
+              Log in
+            </button>
+          </p>
+        </div>
       </div>
     </div>
   );

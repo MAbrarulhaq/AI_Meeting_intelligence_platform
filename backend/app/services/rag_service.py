@@ -34,32 +34,36 @@ NO_CONTEXT_ANSWER = "I couldn't find that information in your meeting history."
 def _safe_invoke_text(chain, payload: dict, step_name: str) -> str:
     """
     Invoke an LCEL chain that returns a plain-text Gemini response.
-    Supports both old and new LangChain/Gemini response formats.
+    Supports both string and list-based Gemini content formats.
     """
     try:
         response = chain.invoke(payload)
-
         content = response.content
 
-        # Old format
+        # Gemini/LangChain may return plain text directly.
         if isinstance(content, str):
             return content.strip()
 
-        # New Gemini format
+        # Newer Gemini response format:
+        # [{"type": "text", "text": "..."}]
         if isinstance(content, list):
             text_parts = []
 
             for block in content:
                 if isinstance(block, dict):
                     if block.get("type") == "text":
-                        text_parts.append(block.get("text", ""))
+                        text = block.get("text", "")
+                        if text:
+                            text_parts.append(text)
 
                 elif hasattr(block, "text"):
-                    text_parts.append(block.text)
+                    text = block.text
+                    if text:
+                        text_parts.append(text)
 
             return "\n".join(text_parts).strip()
 
-        # Last fallback
+        # Final fallback — guarantee a string.
         return str(content).strip()
 
     except OutputParserException as exc:
@@ -88,7 +92,8 @@ def _safe_invoke_text(chain, payload: dict, step_name: str) -> str:
 
     except genai_errors.ServerError as exc:
         raise RuntimeError(
-            f"Gemini is currently unavailable during {step_name}."
+            f"Gemini is currently unavailable during {step_name}. "
+            "Please try again shortly."
         ) from exc
 
     except genai_errors.APIError as exc:
@@ -100,7 +105,6 @@ def _safe_invoke_text(chain, payload: dict, step_name: str) -> str:
         raise RuntimeError(
             f"Unexpected error during {step_name}: {exc}"
         ) from exc
-
 def retrieve_relevant_chunks(
     question: str,
     user_id: uuid.UUID,
@@ -141,10 +145,25 @@ def _build_context(chunks: List[dict]) -> str:
     return "\n\n".join(blocks)
 
 
-def generate_answer(question: str, chunks: List[dict]) -> str:
+def _build_history_text(history: Optional[List[dict]]) -> str:
+    """
+    Format prior conversation turns for the prompt's {history} slot.
+    Expects dicts already truncated to the last few exchanges by the
+    caller (see chat_service.answer_question) — this function doesn't
+    re-truncate, it only formats.
+    """
+    if not history:
+        return "(none)"
+    lines = [f"{turn['role'].capitalize()}: {turn['content']}" for turn in history]
+    return "\n".join(lines)
+
+
+def generate_answer(question: str, chunks: List[dict], history: Optional[List[dict]] = None) -> str:
     """
     Ask Gemini to answer the question using ONLY the retrieved chunks
-    as context — never Gemini's general knowledge.
+    as context — never Gemini's general knowledge. Prior conversation
+    turns (if any) are included only to help resolve follow-up
+    references, not as a source of facts.
 
     Returns the fixed "couldn't find" message without calling Gemini
     at all if no chunks were retrieved (nothing to ground an answer
@@ -154,21 +173,14 @@ def generate_answer(question: str, chunks: List[dict]) -> str:
         return NO_CONTEXT_ANSWER
 
     context = _build_context(chunks)
+    history_text = _build_history_text(history)
     chain = RAG_ANSWER_PROMPT | get_gemini_model()
 
-    logger.info("Generating RAG answer from %d chunk(s)...", len(chunks))
-    logger.info("=" * 80)
-    logger.info("QUESTION:\n%s", question)
-    logger.info("-" * 80)
-    logger.info("CONTEXT SENT TO GEMINI:\n%s", context)
-    logger.info("=" * 80)
+    logger.info("Generating RAG answer from %d chunk(s), %d prior turn(s)...", len(chunks), len(history or []))
     answer = _safe_invoke_text(
-    chain,
-    {
-        "context": context,
-        "question": question,
-    },
-    "RAG answer generation",
+        chain,
+        {"context": context, "question": question, "history": history_text},
+        "RAG answer generation",
     )
-
-    return answer.strip()
+    logger.info("RAG answer generated.")
+    return answer
