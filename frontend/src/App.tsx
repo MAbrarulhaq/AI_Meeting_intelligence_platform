@@ -1,29 +1,24 @@
 import { useState, useEffect } from "react";
+import Home from "./components/Home";
 import Login from "./components/Login";
 import Signup from "./components/Signup";
-import Transcription from "./components/Transcription";
+import AuthenticatedApp from "./components/AuthenticatedApp";
 import { authFetch, clearStoredToken, getStoredToken, storeToken } from "./auth";
+import { AuthUser } from "./types/meeting";
 
 const API_BASE_URL = "http://localhost:8000";
 
-type View = "login" | "signup" | "app";
-
-interface AuthUser {
-  id: string;
-  full_name: string;
-  email: string;
-  created_at: string;
-}
+type View = "home" | "login" | "signup" | "app";
 
 function App() {
-  const [view, setView] = useState<View>("login");
+  const [view, setView] = useState<View>("home");
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
 
   // On page load: if a token is already stored, validate it against
-  // /auth/me before deciding whether to show Login or the app. This
+  // /auth/me before deciding whether to show Home or the app. This
   // is what makes a refresh keep you logged in instead of always
-  // bouncing back to the login page.
+  // bouncing back to the landing page.
   useEffect(() => {
     const token = getStoredToken();
     if (!token) {
@@ -61,7 +56,7 @@ function App() {
   const handleLogout = () => {
     clearStoredToken();
     setCurrentUser(null);
-    setView("login");
+    setView("home");
   };
 
   if (checkingSession) {
@@ -69,6 +64,15 @@ function App() {
       <div className="container">
         <p className="status">Loading...</p>
       </div>
+    );
+  }
+
+  if (view === "home") {
+    return (
+      <Home
+        onGetStarted={() => setView("signup")}
+        onSignIn={() => setView("login")}
+      />
     );
   }
 
@@ -90,7 +94,7 @@ function App() {
     );
   }
 
-  return <Transcription currentUser={currentUser} onLogout={handleLogout} />;
+  return <AuthenticatedApp currentUser={currentUser} onLogout={handleLogout} />;
 }
 
 export default App;

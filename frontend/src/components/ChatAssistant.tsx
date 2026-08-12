@@ -37,13 +37,22 @@ interface ChatAssistantProps {
   // Reuses the meeting list already loaded by Transcription.tsx for
   // the "Selected Meeting" scope dropdown — no separate fetch needed.
   meetings: MeetingOption[];
+  // Optional: when a caller already knows which meeting the chat should
+  // be scoped to (e.g. the AI Assistant tab on a meeting's own details
+  // page), it can preselect that scope. Purely additive — existing
+  // callers that don't pass this keep today's "All Meetings" default.
+  initialScopeMeetingId?: string;
+  // Optional: hides the scope dropdown and shows a static label instead,
+  // for contexts where the scope shouldn't be changeable (a single
+  // meeting's own AI Assistant tab). Defaults to false.
+  lockScope?: boolean;
 }
 
-function ChatAssistant({ meetings }: ChatAssistantProps) {
+function ChatAssistant({ meetings, initialScopeMeetingId, lockScope = false }: ChatAssistantProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
-  const [scopeMeetingId, setScopeMeetingId] = useState<string>("");
+  const [scopeMeetingId, setScopeMeetingId] = useState<string>(initialScopeMeetingId ?? "");
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto scroll to the latest message whenever the conversation changes.
@@ -120,18 +129,24 @@ function ChatAssistant({ meetings }: ChatAssistantProps) {
         }}
       >
         <span style={{ fontSize: "0.85rem", color: "#666" }}>Search scope</span>
-        <select
-          value={scopeMeetingId}
-          onChange={(e) => setScopeMeetingId(e.target.value)}
-          style={{ padding: "6px", borderRadius: "6px" }}
-        >
-          <option value="">All Meetings</option>
-          {meetings.map((meeting) => (
-            <option key={meeting.id} value={meeting.id}>
-              {meeting.filename}
-            </option>
-          ))}
-        </select>
+        {lockScope ? (
+          <span className="badge badge-accent">
+            {meetings.find((m) => m.id === scopeMeetingId)?.filename || "This meeting"}
+          </span>
+        ) : (
+          <select
+            value={scopeMeetingId}
+            onChange={(e) => setScopeMeetingId(e.target.value)}
+            style={{ padding: "6px", borderRadius: "6px" }}
+          >
+            <option value="">All Meetings</option>
+            {meetings.map((meeting) => (
+              <option key={meeting.id} value={meeting.id}>
+                {meeting.filename}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Scrollable message list */}

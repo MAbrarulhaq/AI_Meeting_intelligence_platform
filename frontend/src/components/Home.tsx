@@ -1,6 +1,7 @@
 import Button from "./ui/Button";
 import { Card, Badge } from "./ui/Card";
 import WaveformMark from "./ui/WaveformMark";
+import Footer from "./layout/Footer";
 
 interface HomeProps {
   onGetStarted: () => void;
@@ -179,6 +180,8 @@ function Home({ onGetStarted, onSignIn }: HomeProps) {
           <Button onClick={onGetStarted}>Get started</Button>
         </div>
       </section>
+
+      <Footer />
     </div>
   );
 }
